@@ -1,0 +1,2188 @@
+{
+  "info": {
+    "name": "Cinema_System_V3",
+    "description": "Bộ test REST cho Cinema System: CRUD, Search/Filter/Sort/Pagination, Validation 400, 404, 409, PATCH ghế, Idempotency-Key. Chạy theo thứ tự (Collection Runner). Cần dev profile: admin/Admin@123456. Biến collection tự điền.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "0. Chuẩn bị (đăng nhập, tạo dữ liệu)",
+      "item": [
+        {
+          "name": "Đăng nhập ADMIN",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{userUrl}}/api/v1/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{adminUser}}\",\n  \"password\": \"{{adminPass}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"Có accessToken\", function () { pm.expect(pm.response.json().accessToken).to.be.a(\"string\"); });",
+                  "var j = pm.response.json(); pm.collectionVariables.set(\"adminToken\", j.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Đăng ký CUSTOMER (username ngẫu nhiên)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{userUrl}}/api/v1/auth/register",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\": \"{{customerName}}\", \"password\": \"{{customerPass}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"customerName\", \"cust_\" + Date.now() + \"_\" + Math.floor(Math.random()*1000));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Đăng nhập CUSTOMER",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{userUrl}}/api/v1/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{customerName}}\",\n  \"password\": \"{{customerPass}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"Có accessToken\", function () { pm.expect(pm.response.json().accessToken).to.be.a(\"string\"); });",
+                  "var j = pm.response.json(); pm.collectionVariables.set(\"customerToken\", j.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin tạo phim",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{movieUrl}}/api/v1/movies",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Phim kiểm thử\",\n  \"genre\": \"Hành động\",\n  \"releaseYear\": 2026,\n  \"durationMinutes\": 100,\n  \"status\": \"Đang chiếu\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.be.oneOf([201]); });",
+                  "var j = pm.response.json(); pm.collectionVariables.set(\"movieId\", j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin tạo rạp",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{venueUrl}}/api/v1/cinemas",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Rạp kiểm thử\",\n  \"address\": \"Hà Nội\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.be.oneOf([201]); });",
+                  "var j = pm.response.json(); pm.collectionVariables.set(\"cinemaId\", j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin tạo phòng",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{venueUrl}}/api/v1/rooms",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"Phòng kiểm thử\", \"capacity\": 60, \"cinemaId\": {{cinemaId}}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.be.oneOf([201]); });",
+                  "var j = pm.response.json(); pm.collectionVariables.set(\"roomId\", j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin tạo ghế hàng loạt (A1-A5, B1-B5)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{venueUrl}}/api/v1/rooms/{{roomId}}/seats/generate",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rows\": 2,\n  \"seatsPerRow\": 5,\n  \"vipRows\": [\n    \"B\"\n  ],\n  \"sweetboxRows\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.be.oneOf([201]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lấy ghế của phòng (lưu 3 id đầu)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{venueUrl}}/api/v1/rooms/{{roomId}}/seats",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "var s = pm.response.json(); pm.expect(s.length).to.be.at.least(3);",
+                  "pm.collectionVariables.set(\"seatId\", s[0].id); pm.collectionVariables.set(\"seatId2\", s[1].id); pm.collectionVariables.set(\"seatId3\", s[2].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin tạo suất chiếu (ngày ngẫu nhiên trong tương lai)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{movieUrl}}/api/v1/showtimes",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"movieId\": {{movieId}}, \"roomId\": {{roomId}}, \"showDate\": \"{{showDate}}\", \"startTime\": \"19:00\", \"basePrice\": 90000}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var d = new Date(); d.setDate(d.getDate() + 30 + Math.floor(Math.random()*3000));",
+                  "pm.collectionVariables.set(\"showDate\", d.toISOString().slice(0,10));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.be.oneOf([201]); });",
+                  "var j = pm.response.json(); pm.collectionVariables.set(\"showtimeId\", j.id);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Movie — CRUD + Search/Filter/Sort/Pagination",
+      "item": [
+        {
+          "name": "GET danh sách phim, phân trang + sắp xếp",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{movieUrl}}/api/v1/movies?page=0&size=5&sort=releaseYear,desc",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "var j = pm.response.json();",
+                  "pm.test(\"Có content và size = 5\", function () { pm.expect(j.content).to.be.an(\"array\"); pm.expect(j.size).to.eql(5); });",
+                  "pm.test(\"Sắp xếp giảm dần theo releaseYear\", function () { for (var i = 1; i < j.content.length; i++) pm.expect(j.content[i-1].releaseYear).to.be.at.least(j.content[i].releaseYear); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tìm theo tiêu đề",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{movieUrl}}/api/v1/movies?title=kiểm thử",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"Mọi kết quả chứa từ khóa\", function () { pm.response.json().content.forEach(function (m) { pm.expect(m.title.toLowerCase()).to.include(\"kiểm thử\"); }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lọc theo thể loại",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{movieUrl}}/api/v1/movies?genre=Hành động&page=0&size=10",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"Mọi kết quả đúng thể loại\", function () { pm.response.json().content.forEach(function (m) { pm.expect(m.genre.toLowerCase()).to.include(\"hành động\"); }); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET phim đang chiếu (cache Redis)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{movieUrl}}/api/v1/movies/now-showing",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET phim sắp chiếu",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{movieUrl}}/api/v1/movies/coming-soon",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET phim theo id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{movieUrl}}/api/v1/movies/{{movieId}}",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"Đúng id\", function () { pm.expect(String(pm.response.json().id)).to.eql(pm.collectionVariables.get(\"movieId\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET phim không tồn tại -> 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{movieUrl}}/api/v1/movies/999999",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", function () { pm.expect(pm.response.code).to.be.oneOf([404]); });",
+                  "pm.test(\"Error Response có timestamp/status/error/message/path\", function () {",
+                  "  var j = pm.response.json();",
+                  "  [\"timestamp\",\"status\",\"error\",\"message\",\"path\"].forEach(function (k) { pm.expect(j).to.have.property(k); });",
+                  "  pm.expect(j.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST phim thiếu tiêu đề -> 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{movieUrl}}/api/v1/movies",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"\",\n  \"genre\": \"Hành động\",\n  \"releaseYear\": 2026,\n  \"status\": \"Đang chiếu\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.expect(pm.response.code).to.be.oneOf([400]); });",
+                  "pm.test(\"Error Response có timestamp/status/error/message/path\", function () {",
+                  "  var j = pm.response.json();",
+                  "  [\"timestamp\",\"status\",\"error\",\"message\",\"path\"].forEach(function (k) { pm.expect(j).to.have.property(k); });",
+                  "  pm.expect(j.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST phim năm phát hành sai -> 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{movieUrl}}/api/v1/movies",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Sai năm\",\n  \"genre\": \"Hài\",\n  \"releaseYear\": 1500,\n  \"status\": \"Đang chiếu\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.expect(pm.response.code).to.be.oneOf([400]); });",
+                  "pm.test(\"Error Response có timestamp/status/error/message/path\", function () {",
+                  "  var j = pm.response.json();",
+                  "  [\"timestamp\",\"status\",\"error\",\"message\",\"path\"].forEach(function (k) { pm.expect(j).to.have.property(k); });",
+                  "  pm.expect(j.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST JSON sai định dạng -> 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{movieUrl}}/api/v1/movies",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"title\": \"thiếu ngoặc\"",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.expect(pm.response.code).to.be.oneOf([400]); });",
+                  "pm.test(\"Error Response có timestamp/status/error/message/path\", function () {",
+                  "  var j = pm.response.json();",
+                  "  [\"timestamp\",\"status\",\"error\",\"message\",\"path\"].forEach(function (k) { pm.expect(j).to.have.property(k); });",
+                  "  pm.expect(j.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT cập nhật phim",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{movieUrl}}/api/v1/movies/{{movieId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Phim kiểm thử (đã sửa)\",\n  \"genre\": \"Hành động\",\n  \"releaseYear\": 2026,\n  \"durationMinutes\": 110,\n  \"status\": \"Đang chiếu\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"Tiêu đề đã đổi\", function () { pm.expect(pm.response.json().title).to.include(\"đã sửa\"); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Venue — Rạp, phòng, ghế (có PATCH)",
+      "item": [
+        {
+          "name": "GET danh sách rạp",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{venueUrl}}/api/v1/cinemas",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST phòng thiếu tên -> 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{venueUrl}}/api/v1/rooms",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"\", \"capacity\": 10, \"cinemaId\": {{cinemaId}}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.expect(pm.response.code).to.be.oneOf([400]); });",
+                  "pm.test(\"Error Response có timestamp/status/error/message/path\", function () {",
+                  "  var j = pm.response.json();",
+                  "  [\"timestamp\",\"status\",\"error\",\"message\",\"path\"].forEach(function (k) { pm.expect(j).to.have.property(k); });",
+                  "  pm.expect(j.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH ghế: giữ ghế (status=HELD)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{venueUrl}}/api/v1/seats/{{seatId3}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"HELD\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"status = HELD\", function () { pm.expect(pm.response.json().status).to.eql(\"HELD\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH ghế: nhả ghế (status=AVAILABLE)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{venueUrl}}/api/v1/seats/{{seatId3}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"AVAILABLE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"status = AVAILABLE\", function () { pm.expect(pm.response.json().status).to.eql(\"AVAILABLE\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH ghế: đổi loại ghế (seatType=VIP)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{venueUrl}}/api/v1/seats/{{seatId3}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seatType\": \"VIP\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"seatType = VIP và status giữ nguyên\", function () { var s = pm.response.json(); pm.expect(s.seatType).to.eql(\"VIP\"); pm.expect(s.status).to.eql(\"AVAILABLE\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH ghế: body rỗng -> 400",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{venueUrl}}/api/v1/seats/{{seatId3}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.expect(pm.response.code).to.be.oneOf([400]); });",
+                  "pm.test(\"Error Response có timestamp/status/error/message/path\", function () {",
+                  "  var j = pm.response.json();",
+                  "  [\"timestamp\",\"status\",\"error\",\"message\",\"path\"].forEach(function (k) { pm.expect(j).to.have.property(k); });",
+                  "  pm.expect(j.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH ghế: status sai giá trị -> 400",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{venueUrl}}/api/v1/seats/{{seatId3}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"BAY_LUON\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.expect(pm.response.code).to.be.oneOf([400]); });",
+                  "pm.test(\"Error Response có timestamp/status/error/message/path\", function () {",
+                  "  var j = pm.response.json();",
+                  "  [\"timestamp\",\"status\",\"error\",\"message\",\"path\"].forEach(function (k) { pm.expect(j).to.have.property(k); });",
+                  "  pm.expect(j.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH ghế không tồn tại -> 404",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{venueUrl}}/api/v1/seats/999999",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"HELD\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", function () { pm.expect(pm.response.code).to.be.oneOf([404]); });",
+                  "pm.test(\"Error Response có timestamp/status/error/message/path\", function () {",
+                  "  var j = pm.response.json();",
+                  "  [\"timestamp\",\"status\",\"error\",\"message\",\"path\"].forEach(function (k) { pm.expect(j).to.have.property(k); });",
+                  "  pm.expect(j.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Showtime",
+      "item": [
+        {
+          "name": "GET suất chiếu theo phim + ngày",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{movieUrl}}/api/v1/showtimes?movieId={{movieId}}&date={{showDate}}",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"Có suất vừa tạo\", function () { pm.expect(pm.response.json().length).to.be.at.least(1); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET suất chiếu theo id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{movieUrl}}/api/v1/showtimes/{{showtimeId}}",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET suất chiếu không tồn tại -> 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{movieUrl}}/api/v1/showtimes/999999",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", function () { pm.expect(pm.response.code).to.be.oneOf([404]); });",
+                  "pm.test(\"Error Response có timestamp/status/error/message/path\", function () {",
+                  "  var j = pm.response.json();",
+                  "  [\"timestamp\",\"status\",\"error\",\"message\",\"path\"].forEach(function (k) { pm.expect(j).to.have.property(k); });",
+                  "  pm.expect(j.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST suất chiếu trùng giờ phòng -> 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{movieUrl}}/api/v1/showtimes",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"movieId\": {{movieId}}, \"roomId\": {{roomId}}, \"showDate\": \"{{showDate}}\", \"startTime\": \"19:30\", \"basePrice\": 90000}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.expect(pm.response.code).to.be.oneOf([409]); });",
+                  "pm.test(\"Error Response có timestamp/status/error/message/path\", function () {",
+                  "  var j = pm.response.json();",
+                  "  [\"timestamp\",\"status\",\"error\",\"message\",\"path\"].forEach(function (k) { pm.expect(j).to.have.property(k); });",
+                  "  pm.expect(j.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST suất chiếu giá âm -> 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{movieUrl}}/api/v1/showtimes",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"movieId\": {{movieId}}, \"roomId\": {{roomId}}, \"showDate\": \"{{showDate}}\", \"startTime\": \"10:00\", \"basePrice\": -5}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.expect(pm.response.code).to.be.oneOf([400]); });",
+                  "pm.test(\"Error Response có timestamp/status/error/message/path\", function () {",
+                  "  var j = pm.response.json();",
+                  "  [\"timestamp\",\"status\",\"error\",\"message\",\"path\"].forEach(function (k) { pm.expect(j).to.have.property(k); });",
+                  "  pm.expect(j.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Booking — Status code, Nested resource, Idempotency",
+      "item": [
+        {
+          "name": "Đặt vé (có Idempotency-Key) -> 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idemKey}}"
+              }
+            ],
+            "url": "{{bookingUrl}}/api/v1/tickets",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"showtimeId\": {{showtimeId}}, \"seatId\": {{seatId}}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"idemKey\", \"order-\" + Date.now() + \"-\" + Math.floor(Math.random()*100000));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.be.oneOf([201]); });",
+                  "var j = pm.response.json();",
+                  "pm.test(\"Vé PENDING, có expiresAt\", function () { pm.expect(j.status).to.eql(\"PENDING\"); pm.expect(j.expiresAt).to.be.a(\"string\"); });",
+                  "pm.collectionVariables.set(\"ticketId\", j.id); pm.collectionVariables.set(\"customerId\", j.userId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Gửi lại CÙNG Idempotency-Key -> 200, trả lại vé cũ",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idemKey}}"
+              }
+            ],
+            "url": "{{bookingUrl}}/api/v1/tickets",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"showtimeId\": {{showtimeId}}, \"seatId\": {{seatId}}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"Header Idempotent-Replayed = true\", function () { pm.expect(pm.response.headers.get(\"Idempotent-Replayed\")).to.eql(\"true\"); });",
+                  "pm.test(\"Cùng id vé, không tạo vé mới\", function () { pm.expect(String(pm.response.json().id)).to.eql(String(pm.collectionVariables.get(\"ticketId\"))); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CÙNG Idempotency-Key nhưng ghế khác -> 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idemKey}}"
+              }
+            ],
+            "url": "{{bookingUrl}}/api/v1/tickets",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"showtimeId\": {{showtimeId}}, \"seatId\": {{seatId2}}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.expect(pm.response.code).to.be.oneOf([409]); });",
+                  "pm.test(\"Error Response có timestamp/status/error/message/path\", function () {",
+                  "  var j = pm.response.json();",
+                  "  [\"timestamp\",\"status\",\"error\",\"message\",\"path\"].forEach(function (k) { pm.expect(j).to.have.property(k); });",
+                  "  pm.expect(j.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Idempotency-Key sai định dạng -> 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "co dau cach"
+              }
+            ],
+            "url": "{{bookingUrl}}/api/v1/tickets",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"showtimeId\": {{showtimeId}}, \"seatId\": {{seatId2}}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.expect(pm.response.code).to.be.oneOf([400]); });",
+                  "pm.test(\"Error Response có timestamp/status/error/message/path\", function () {",
+                  "  var j = pm.response.json();",
+                  "  [\"timestamp\",\"status\",\"error\",\"message\",\"path\"].forEach(function (k) { pm.expect(j).to.have.property(k); });",
+                  "  pm.expect(j.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Đặt trùng ghế đang giữ (không key) -> 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{bookingUrl}}/api/v1/tickets",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"showtimeId\": {{showtimeId}}, \"seatId\": {{seatId}}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.expect(pm.response.code).to.be.oneOf([409]); });",
+                  "pm.test(\"Error Response có timestamp/status/error/message/path\", function () {",
+                  "  var j = pm.response.json();",
+                  "  [\"timestamp\",\"status\",\"error\",\"message\",\"path\"].forEach(function (k) { pm.expect(j).to.have.property(k); });",
+                  "  pm.expect(j.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Đặt vé thiếu seatId -> 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{bookingUrl}}/api/v1/tickets",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"showtimeId\": {{showtimeId}}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.expect(pm.response.code).to.be.oneOf([400]); });",
+                  "pm.test(\"Error Response có timestamp/status/error/message/path\", function () {",
+                  "  var j = pm.response.json();",
+                  "  [\"timestamp\",\"status\",\"error\",\"message\",\"path\"].forEach(function (k) { pm.expect(j).to.have.property(k); });",
+                  "  pm.expect(j.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Đặt vé suất chiếu không tồn tại -> 404",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{bookingUrl}}/api/v1/tickets",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"showtimeId\": 999999, \"seatId\": {{seatId}}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", function () { pm.expect(pm.response.code).to.be.oneOf([404]); });",
+                  "pm.test(\"Error Response có timestamp/status/error/message/path\", function () {",
+                  "  var j = pm.response.json();",
+                  "  [\"timestamp\",\"status\",\"error\",\"message\",\"path\"].forEach(function (k) { pm.expect(j).to.have.property(k); });",
+                  "  pm.expect(j.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Giữ ghế thủ công rồi đặt -> 409 (ghế HELD)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{venueUrl}}/api/v1/seats/{{seatId3}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"HELD\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Đặt ghế đang HELD -> 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{bookingUrl}}/api/v1/tickets",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"showtimeId\": {{showtimeId}}, \"seatId\": {{seatId3}}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.expect(pm.response.code).to.be.oneOf([409]); });",
+                  "pm.test(\"Error Response có timestamp/status/error/message/path\", function () {",
+                  "  var j = pm.response.json();",
+                  "  [\"timestamp\",\"status\",\"error\",\"message\",\"path\"].forEach(function (k) { pm.expect(j).to.have.property(k); });",
+                  "  pm.expect(j.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Nhả ghế lại (AVAILABLE)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{venueUrl}}/api/v1/seats/{{seatId3}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"AVAILABLE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET vé của tôi",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{bookingUrl}}/api/v1/tickets/my-tickets",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"Có vé vừa đặt\", function () { pm.expect(pm.response.json().length).to.be.at.least(1); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET chi tiết vé",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{bookingUrl}}/api/v1/tickets/{{ticketId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET vé không tồn tại -> 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{bookingUrl}}/api/v1/tickets/999999",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", function () { pm.expect(pm.response.code).to.be.oneOf([404]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Thanh toán giả lập -> 200 PAID",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{bookingUrl}}/api/v1/tickets/{{ticketId}}/pay",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"PAID\", function () { pm.expect(pm.response.json().status).to.eql(\"PAID\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Thanh toán lần 2 -> 409",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{bookingUrl}}/api/v1/tickets/{{ticketId}}/pay",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.expect(pm.response.code).to.be.oneOf([409]); });",
+                  "pm.test(\"Error Response có timestamp/status/error/message/path\", function () {",
+                  "  var j = pm.response.json();",
+                  "  [\"timestamp\",\"status\",\"error\",\"message\",\"path\"].forEach(function (k) { pm.expect(j).to.have.property(k); });",
+                  "  pm.expect(j.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Đặt ghế khác để thử hủy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{bookingUrl}}/api/v1/tickets",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"showtimeId\": {{showtimeId}}, \"seatId\": {{seatId2}}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.be.oneOf([201]); });",
+                  "pm.collectionVariables.set(\"ticketId2\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hủy vé PENDING -> 200 CANCELLED",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{bookingUrl}}/api/v1/tickets/{{ticketId2}}/cancel",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"CANCELLED\", function () { pm.expect(pm.response.json().status).to.eql(\"CANCELLED\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hủy lần 2 -> 409",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{bookingUrl}}/api/v1/tickets/{{ticketId2}}/cancel",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.expect(pm.response.code).to.be.oneOf([409]); });",
+                  "pm.test(\"Error Response có timestamp/status/error/message/path\", function () {",
+                  "  var j = pm.response.json();",
+                  "  [\"timestamp\",\"status\",\"error\",\"message\",\"path\"].forEach(function (k) { pm.expect(j).to.have.property(k); });",
+                  "  pm.expect(j.status).to.eql(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Đặt lại đúng ghế vừa hủy -> 201 (ghế đã được nhả)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{bookingUrl}}/api/v1/tickets",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"showtimeId\": {{showtimeId}}, \"seatId\": {{seatId2}}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.be.oneOf([201]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Nested resource: GET /users/{userId}/tickets (chủ vé)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{bookingUrl}}/api/v1/users/{{customerId}}/tickets",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.be.oneOf([200]); });",
+                  "pm.test(\"Có vé\", function () { pm.expect(pm.response.json().length).to.be.at.least(1); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "userUrl",
+      "value": "http://localhost:8081"
+    },
+    {
+      "key": "movieUrl",
+      "value": "http://localhost:8082"
+    },
+    {
+      "key": "venueUrl",
+      "value": "http://localhost:8083"
+    },
+    {
+      "key": "bookingUrl",
+      "value": "http://localhost:8084"
+    },
+    {
+      "key": "adminUser",
+      "value": "admin"
+    },
+    {
+      "key": "adminPass",
+      "value": "Admin@123456"
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "customerToken",
+      "value": ""
+    },
+    {
+      "key": "customerName",
+      "value": ""
+    },
+    {
+      "key": "customerPass",
+      "value": "Cust@123456"
+    },
+    {
+      "key": "movieId",
+      "value": ""
+    },
+    {
+      "key": "cinemaId",
+      "value": ""
+    },
+    {
+      "key": "roomId",
+      "value": ""
+    },
+    {
+      "key": "seatId",
+      "value": ""
+    },
+    {
+      "key": "seatId2",
+      "value": ""
+    },
+    {
+      "key": "seatId3",
+      "value": ""
+    },
+    {
+      "key": "showtimeId",
+      "value": ""
+    },
+    {
+      "key": "ticketId",
+      "value": ""
+    },
+    {
+      "key": "ticketId2",
+      "value": ""
+    },
+    {
+      "key": "idemKey",
+      "value": ""
+    },
+    {
+      "key": "showDate",
+      "value": ""
+    },
+    {
+      "key": "customerId",
+      "value": ""
+    }
+  ]
+}
